@@ -2,6 +2,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "PlayerSettings.h"
+#import "Shared/LockScreenArtwork/LockScreenArtwork.h"
 
 UIViewController *SGLockScreenWidgetPage(void) {
     return [[SGModPage alloc] initWithTitle:@"Lock screen widget" intro:SGRestartNote sections:@[
@@ -12,8 +13,7 @@ UIViewController *SGLockScreenWidgetPage(void) {
             SGFlagRow(@"Burst skip", @"ios-feature-lockscreen.burst_skip_enabled"),
         ]),
         SGSection(@"Artwork", @[
-            SGFlagRow(@"Animated artwork", @"ios-feature-lockscreen.animated_artwork_enabled"),
-            SGFlagRow(@"Video artwork", @"ios-feature-lockscreen.vit_artwork_enabled"),
+            SGAnimatedArtworkRow(),
             SGFlagRow(@"Companion content", @"ios-feature-lockscreen.companion_content_enabled"),
         ]),
     ] footer:nil];
