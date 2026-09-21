@@ -1,6 +1,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"
+#import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Navbar.h"
 
 // What "Add a tab" offers: URIs Spotify's own router resolves to a page of its own, each with the
@@ -213,7 +214,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    if (section == SGRNavbarSectionSwitch) return 2;
+    if (section == SGRNavbarSectionSwitch) return 3;
     return section == SGRNavbarSectionTabs ? (NSInteger)_entries.count : 1;
 }
 
@@ -239,12 +240,13 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     UITableViewCell *cell = SGDequeueCell(table, @"navbar");
     switch (path.section) {
         case SGRNavbarSectionSwitch: {
-            BOOL labels = path.row == 1;
-            SGFillCell(cell, labels ? @"Hide labels" : @"Custom navbar", labels ? @"Icons only" : nil, nil, nil);
+            BOOL labels = path.row == 1, inlinePlayer = path.row == 2;
+            if (inlinePlayer) SGFillCell(cell, @"Mini player in the tab bar", @"Moves in beside the tabs on scroll. Restart to apply", nil, nil);
+            else SGFillCell(cell, labels ? @"Hide labels" : @"Custom navbar", labels ? @"Icons only" : nil, nil, nil);
             UISwitch *toggle = [UISwitch new];
             toggle.onTintColor = SGGreen();
             toggle.tag = path.row;
-            toggle.on = labels ? SGHidden(SGRKeyNavbarHideLabels) : SGEnabled(SGRKeyNavbar);
+            toggle.on = inlinePlayer ? SGHidden(SGRKeyInlinePlayer) : labels ? SGHidden(SGRKeyNavbarHideLabels) : SGEnabled(SGRKeyNavbar);
             [toggle addTarget:self action:@selector(toggled:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = toggle;
             break;
@@ -316,6 +318,11 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (void)toggled:(UISwitch *)toggle {
+    // The mini player is read at launch.
+    if (toggle.tag == 2) {
+        SGSetEnabled(SGRKeyInlinePlayer, toggle.on);
+        return;
+    }
     SGSetEnabled(toggle.tag == 1 ? SGRKeyNavbarHideLabels : SGRKeyNavbar, toggle.on);
     SGRRefreshTabBar();
 }

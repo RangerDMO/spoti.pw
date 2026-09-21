@@ -38,8 +38,13 @@
 @interface _TtC18NowPlaying_BarImpl27NowPlayingBarViewController : UIViewController
 @end
 @implementation _TtC18NowPlaying_BarImpl27NowPlayingBarViewController
+// Spotify's bar opens the player on a tap; here the tap is logged, for the mini player's hand-over.
+- (void)openPlayer {
+    NSLog(@"[harness] Spotify's bar was tapped: the player would open");
+}
 - (void)loadView {
     self.view = [UIView new];
+    [self.view addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openPlayer)]];
     // The card, 386x56 at {8,0} with the album colour, the artwork, two lines and the progress line
     // (trees/clean/home/01.txt, SPTNowPlayingBar).
     UIView *card = [UIView new];
@@ -60,6 +65,8 @@
     art.clipsToBounds = YES;
     UIImageView *image = [[UIImageView alloc] initWithFrame:art.bounds];
     image.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.55 alpha:1];
+    image.image = [[UIImage systemImageNamed:@"music.note"] imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal];
+    image.contentMode = UIViewContentModeCenter;
     [art addSubview:image];
     [card addSubview:art];
     UILabel *title = [UILabel new], *artist = [UILabel new];
@@ -363,6 +370,9 @@ static void report(SGHarnessChrome *chrome, NSString *moment) {
 // Before every %ctor, so the redesign's gate reads on.
 __attribute__((constructor(101))) static void sgr_harnessDefaults(void) {
     [NSUserDefaults.standardUserDefaults setBool:YES forKey:@"spotifyglass.redesign"];
+    // `inline`: the mini player in the tab bar (SGRKeyInlinePlayer).
+    BOOL inlinePlayer = [NSProcessInfo.processInfo.arguments containsObject:@"inline"];
+    [NSUserDefaults.standardUserDefaults setBool:inlinePlayer forKey:@"spotifyglass.redesign.inlinePlayer"];
 }
 
 @interface SGHarnessApp : UIResponder <UIApplicationDelegate>

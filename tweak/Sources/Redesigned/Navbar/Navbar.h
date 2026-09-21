@@ -24,6 +24,8 @@ void SGRComposeTabBar(UIView *tabBar);
 void SGRLogTabBarRow(UIView *tabBar);
 // Lays the bar out again after the Navbar page changes something, so it does not wait for a touch.
 void SGRRefreshTabBar(void);
+// TabBar.x: calls what the tap recognizers on `view` itself call, the way a real tap ends; NO when none did.
+BOOL SGRFireTapRecognizers(UIView *view);
 
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour
