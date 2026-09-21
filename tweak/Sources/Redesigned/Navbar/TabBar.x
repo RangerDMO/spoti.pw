@@ -514,6 +514,11 @@ static void nameScrollView(void) {
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     UITabBar *bar = self.tabs.tabBar;
+    // Expanded, the accessory is not inside the bar and UIKit's views around it are not named for it.
+    if (@available(iOS 26.0, *)) {
+        UIView *mini = self.tabs.bottomAccessory.contentView;
+        if (mini && [hit isDescendantOfView:mini]) return hit;
+    }
     for (UIView *v = hit; v && v != self; v = v.superview) {
         if (v == bar) return hit == bar ? nil : hit;
         if ([NSStringFromClass(v.class) containsString:@"Accessory"]) return hit;
@@ -602,8 +607,8 @@ static void nameScrollView(void) {
 
 @end
 
-// Spotify's Search tab becomes UIKit's search tab, the one that stays beside the minimized bar. Encore
-// names its icon "search"; a label is the fallback.
+// Spotify's Search tab, when it is the last tab, becomes UIKit's search tab, the one that stays beside
+// the minimized bar. Encore names its icon "search"; a label is the fallback.
 static BOOL isSearch(UIView *item) {
     UIView *live = iconIn(item);
     id icon = live ? encoreIconOf(live) : nil;
@@ -675,7 +680,9 @@ static void syncInline(UIView *stockBar) API_AVAILABLE(ios(26.0)) {
         for (UIView *source in sources) {
             NSString *title = hideLabels ? @"" : (labelIn(source).text ?: @"");
             UITab *tab;
-            if (!searchTaken && isSearch(source)) {
+            // UIKit puts a search tab in the circle at the trailing end whatever the order, so Search is one
+            // only where the Navbar order already has it last; anywhere else it stays a tab where it was put.
+            if (!searchTaken && source == sources.lastObject && isSearch(source)) {
                 searchTaken = YES;
                 UISearchTab *search = [[UISearchTab alloc] initWithViewControllerProvider:^UIViewController *(UITab *t) { return inlinePage(t); }];
                 search.automaticallyActivatesSearch = NO;
@@ -689,7 +696,7 @@ static void syncInline(UIView *stockBar) API_AVAILABLE(ios(26.0)) {
         }
         tabs.sources = sources;
         tabs.tabs = list;
-        SGLog(@"tab bar: %lu tabs on the mini player's bar, Search %@", (unsigned long)list.count, searchTaken ? @"pinned" : @"not found");
+        SGLog(@"tab bar: %lu tabs on the mini player's bar, Search %@", (unsigned long)list.count, searchTaken ? @"pinned" : @"in the order or not found");
     }
 
     // Spotify's selected tab shows its filled icon, as UITabBarItem's selectedImage did on the other bar.

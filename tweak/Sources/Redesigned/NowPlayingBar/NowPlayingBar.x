@@ -160,9 +160,17 @@ static void styleNowPlayingBar(UIViewController *container) {
     sg_barContainer = container.view;
     // The mini player in the tab bar takes the bar's place: Spotify's bar stays, laid out and loading its
     // artwork for the mini player, but nobody sees or touches it.
+    // The bar's page (NowPlaying_BarPageImpl's TouchPassthroughView) stands over the tab bar container
+    // where the expanded mini player is, and took its touches (harness/tabbar), so it takes none either;
+    // the bar is all it holds.
     if (SGRInlinePlayer()) {
         if (container.view.alpha != 0) container.view.alpha = 0;
         if (container.view.userInteractionEnabled) container.view.userInteractionEnabled = NO;
+        for (UIView *v = container.view.superview; v && ![v isKindOfClass:UIWindow.class]; v = v.superview) {
+            if (![NSStringFromClass(v.class) containsString:@"TouchPassthroughView"]) continue;
+            if (v.userInteractionEnabled) v.userInteractionEnabled = NO;
+            break;
+        }
     }
 
     UIView *card = sgr_nowPlayingCard;

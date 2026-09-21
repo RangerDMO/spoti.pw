@@ -31,6 +31,7 @@ void SGOpenModSettings(UIView *source) {}
 
 @interface SGHarnessState : NSObject
 @property (nonatomic, strong) SGHarnessTrack *track;
+@property (nonatomic) BOOL isPaused;
 @end
 @implementation SGHarnessState
 @end
@@ -74,6 +75,15 @@ NSString *SGURIString(id uri) {
     NSLog(@"[harness] player skips %+ld to %@", (long)by, sg_state.track.trackTitle);
     for (id<SGHarnessObserver> observer in sg_observers.allObjects) [observer playerStateDidChange:sg_state];
 }
+- (void)setPaused:(BOOL)paused {
+    SGHarnessState *state = stateAt(sg_index);
+    state.isPaused = paused;
+    sg_state = state;
+    NSLog(@"[harness] player %@", paused ? @"pauses" : @"resumes");
+    for (id<SGHarnessObserver> observer in sg_observers.allObjects) [observer playerStateDidChange:sg_state];
+}
+- (id)pause:(id)options { [self setPaused:YES]; return @"pause"; }
+- (id)resume:(id)options { [self setPaused:NO]; return @"resume"; }
 - (id)skipToNextTrackWithOptions:(id)options { [self step:1]; return @"next"; }
 - (id)skipToPreviousTrackWithOptions:(id)options { [self step:-1]; return @"previous"; }
 @end

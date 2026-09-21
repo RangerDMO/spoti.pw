@@ -3,8 +3,8 @@
 // between the selected tab and Search when the bar minimizes on scroll; the view only lays itself out
 // for the space it is given, by the tabAccessoryEnvironment trait.
 //
-// The first cut: artwork, title and artist, a swipe to skip and a tap to open the player. Title and
-// artist come from the player's state (Shared/Player/PlayerState.h). The artwork is the picture on
+// The first cut: artwork, title and artist, play/pause, a swipe to skip and a tap to open the player.
+// Title, artist and paused come from the player's state (Shared/Player/PlayerState.h). The artwork is the picture on
 // Spotify's own bar, which is still there under the tab bar, invisible, and keeps loading it; a tap is
 // passed on to that bar, so the player opens the way it always does.
 #import "Core/SGCore.h"
@@ -29,6 +29,7 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
     UIView *_content;         // what a swipe moves
     UIImageView *_artwork;
     UILabel *_title, *_artist;
+    UIButton *_play;
     __weak UIImageView *_source;   // the artwork on Spotify's bar, watched for its picture
     BOOL _swiping;
 }
@@ -58,7 +59,15 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
     _artist.textColor = [UIColor colorWithWhite:1 alpha:0.6];
     [_content addSubview:_artist];
 
-    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped)];
+    // Outside the part a swipe moves, so the button stays put while the track slides. A control in
+    // UIKit's accessory never gets its touch up (simulator, iOS 26.5), so the card's own tap
+    // recognizer works it and the button only draws.
+    _play = [UIButton buttonWithType:UIButtonTypeSystem];
+    _play.tintColor = UIColor.whiteColor;
+    _play.userInteractionEnabled = NO;
+    [self addSubview:_play];
+
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)];
     [self addGestureRecognizer:tap];
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panned:)];
     pan.delegate = self;
@@ -103,11 +112,20 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
     BOOL compact = [self isInline];
     CGFloat side = MAX(0, MIN(height - (compact ? 10 : 12), 40));
     CGFloat inset = (height - side) / 2;
-    _artwork.frame = CGRectMake(MAX(inset, 6), inset, side, side);
-    _artwork.layer.cornerRadius = compact ? side / 2 : 6;
+    // Concentric with the capsule's end: as far in from the side as from the top and bottom, and round,
+    // which is the capsule's radius less that inset.
+    _artwork.frame = CGRectMake(inset, inset, side, side);
+    _artwork.layer.cornerRadius = side / 2;
+
+    CGFloat button = MIN(height, 44);
+    // Bounds and centre, not frame: the press animation scales it.
+    _play.bounds = CGRectMake(0, 0, button, button);
+    _play.center = CGPointMake(bounds.size.width - button / 2 - (compact ? 2 : 6), height / 2);
+    UIImageSymbolConfiguration *symbol = [UIImageSymbolConfiguration configurationWithPointSize:compact ? 17 : 20 weight:UIImageSymbolWeightBold];
+    if (![_play.currentPreferredSymbolConfiguration isEqual:symbol]) [_play setPreferredSymbolConfiguration:symbol forImageInState:UIControlStateNormal];
 
     CGFloat x = CGRectGetMaxX(_artwork.frame) + 10;
-    CGFloat width = MAX(0, bounds.size.width - x - 14);
+    CGFloat width = MAX(0, _play.center.x - button / 2 - x - 4);
     _artist.hidden = compact || !_artist.text.length;
     if (_artist.hidden) {
         _title.frame = CGRectMake(x, 0, width, height);
@@ -129,6 +147,8 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
     SPTPlayerTrack *track = state.track;
     NSString *title = [track respondsToSelector:@selector(trackTitle)] ? track.trackTitle : nil;
     NSString *artist = [track respondsToSelector:@selector(artistName)] ? track.artistName : nil;
+    BOOL paused = [state respondsToSelector:@selector(isPaused)] ? state.isPaused : NO;
+    [self showPaused:paused];
     if (![_title.text isEqualToString:title] || ![_artist.text isEqualToString:artist]) {
         _title.text = title;
         _artist.text = artist;
@@ -169,9 +189,42 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
     });
 }
 
+- (void)showPaused:(BOOL)paused {
+    UIImage *image = [UIImage systemImageNamed:paused ? @"play.fill" : @"pause.fill"];
+    if (![[_play imageForState:UIControlStateNormal] isEqual:image]) [_play setImage:image forState:UIControlStateNormal];
+    _play.accessibilityLabel = paused ? @"Play" : @"Pause";
+}
+
 #pragma mark - touches
 
-- (void)tapped {
+// Shown at once, and the state the player reports next sets it right if the command did not take.
+- (void)togglePlay {
+    id<SPTPlayer> player = SGKaraokePlayer();
+    SPTPlayerState *state = SGPlayerState();
+    BOOL paused = [state respondsToSelector:@selector(isPaused)] ? state.isPaused : NO;
+    SEL command = paused ? @selector(resume:) : @selector(pause:);
+    if (![player respondsToSelector:command]) {
+        SGLog(@"mini player: the player (%@) cannot %@", player ? NSStringFromClass([(id)player class]) : @"nil", NSStringFromSelector(command));
+        return;
+    }
+    [self showPaused:!paused];
+    _play.transform = CGAffineTransformMakeScale(0.8, 0.8);
+    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.5 initialSpringVelocity:0 options:UIViewAnimationOptionAllowUserInteraction animations:^{
+        self->_play.transform = CGAffineTransformIdentity;
+    } completion:nil];
+    id result = paused ? [player resume:nil] : [player pause:nil];
+    SGLog(@"mini player: %@ -> %@", paused ? @"resume" : @"pause", result);
+}
+
+- (void)tapped:(UITapGestureRecognizer *)tap {
+    // A tap near the button is the button's: it is a small target on a card that opens the player.
+    CGPoint center = _play.center;
+    CGFloat reach = _play.bounds.size.width / 2 + 6;
+    CGPoint point = [tap locationInView:self];
+    if (fabs(point.x - center.x) <= reach && fabs(point.y - center.y) <= reach) {
+        [self togglePlay];
+        return;
+    }
     if (!SGROpenPlayerFromBar()) SGLog(@"mini player: nothing on Spotify's bar took the tap");
 }
 

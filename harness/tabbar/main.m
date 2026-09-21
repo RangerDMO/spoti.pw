@@ -402,6 +402,14 @@ static void after(double seconds, dispatch_block_t block) {
     NSArray<NSString *> *args = NSProcessInfo.processInfo.arguments;
     NSString *mode = args.count > 1 ? args[1] : @"none";
     if ([mode isEqualToString:@"away"]) [chrome setBanner:YES animated:NO];
+    // What a touch on the mini player's middle and on its button lands on, up to the window.
+    if ([mode isEqualToString:@"inline"]) after(3, ^{
+        for (NSValue *value in @[[NSValue valueWithCGPoint:CGPointMake(200, 759)], [NSValue valueWithCGPoint:CGPointMake(352, 759)]]) {
+            NSMutableString *chain = [NSMutableString string];
+            for (UIView *v = [self.window hitTest:value.CGPointValue withEvent:nil]; v; v = v.superview) [chain appendFormat:@" < %@", NSStringFromClass(v.class)];
+            NSLog(@"[harness] touch at %@ lands on%@", NSStringFromCGPoint(value.CGPointValue), chain);
+        }
+    });
     after(0.5, ^{
         UITableView *list = (UITableView *)chrome.tabs.childViewControllers.firstObject.view;
         [list scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:29 inSection:0] atScrollPosition:UITableViewScrollPositionBottom animated:NO];
